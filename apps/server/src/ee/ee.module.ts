@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
+import { ApiKeyModule } from './api-key/api-key.module';
 
 @Module({
-  imports: [],
+  imports: [ApiKeyModule],
+  exports: [ApiKeyModule],
 })
 export class EeModule {}
