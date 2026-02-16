@@ -67,6 +67,7 @@ export class TypesenseProcessor extends WorkerHost implements OnModuleDestroy {
       .selectFrom('pages')
       .select([
         'id',
+        'slugId',
         'title',
         'textContent',
         'icon',
@@ -84,6 +85,7 @@ export class TypesenseProcessor extends WorkerHost implements OnModuleDestroy {
     for (const page of pages) {
       const doc = {
         id: page.id,
+        slugId: page.slugId || '',
         title: page.title || '',
         content: page.textContent || '',
         icon: page.icon || '',
@@ -123,6 +125,7 @@ export class TypesenseProcessor extends WorkerHost implements OnModuleDestroy {
         .selectFrom('pages')
         .select([
           'id',
+          'slugId',
           'title',
           'textContent',
           'icon',
@@ -142,6 +145,7 @@ export class TypesenseProcessor extends WorkerHost implements OnModuleDestroy {
       for (const page of pages) {
         const doc = {
           id: page.id,
+          slugId: page.slugId || '',
           title: page.title || '',
           content: page.textContent || '',
           icon: page.icon || '',

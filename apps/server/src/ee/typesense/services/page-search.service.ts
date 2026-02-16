@@ -42,12 +42,13 @@ function getTypesenseClient(): TypesenseClient {
   const apiKey = process.env.TYPESENSE_API_KEY || 'docmost-typesense-key';
 
   const parsed = new URL(url);
+  const defaultPort = parsed.protocol === 'https:' ? '443' : '8108';
 
   return new TypesenseClient({
     nodes: [
       {
         host: parsed.hostname,
-        port: parseInt(parsed.port || '8108', 10),
+        port: parseInt(parsed.port || defaultPort, 10),
         protocol: parsed.protocol.replace(':', ''),
       },
     ],
@@ -215,6 +216,7 @@ export class PageSearchService {
           title: (doc.title as string) || '',
           icon: (doc.icon as string) || null,
           parentPageId: (doc.parentPageId as string) || null,
+          slugId: (doc.slugId as string) || '',
           creatorId: (doc.creatorId as string) || '',
           rank: Number(hit.text_match_info?.score || '0'),
           highlight,
@@ -250,6 +252,7 @@ export class PageSearchService {
         fields: [
           { name: 'title', type: 'string' },
           { name: 'content', type: 'string' },
+          { name: 'slugId', type: 'string', index: false, optional: true },
           { name: 'spaceId', type: 'string', facet: true },
           { name: 'workspaceId', type: 'string', facet: true },
           { name: 'creatorId', type: 'string', facet: true },

@@ -5,6 +5,7 @@ export class SearchResponseDto {
   title: string;
   icon: string;
   parentPageId: string;
+  slugId: string;
   creatorId: string;
   rank: number;
   highlight: string;

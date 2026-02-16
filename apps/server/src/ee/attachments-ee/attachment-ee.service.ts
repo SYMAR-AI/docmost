@@ -31,12 +31,13 @@ function getTypesenseClient(): TypesenseClient {
   const apiKey = process.env.TYPESENSE_API_KEY || 'docmost-typesense-key';
 
   const parsed = new URL(url);
+  const defaultPort = parsed.protocol === 'https:' ? '443' : '8108';
 
   return new TypesenseClient({
     nodes: [
       {
         host: parsed.hostname,
-        port: parseInt(parsed.port || '8108', 10),
+        port: parseInt(parsed.port || defaultPort, 10),
         protocol: parsed.protocol.replace(':', ''),
       },
     ],
