@@ -54,7 +54,12 @@ export function parseRedisUrl(redisUrl: string): RedisConfig {
     family = parseInt(familyParam, 10);
   }
 
-  return { host: hostname, port: portInt, password, db, family };
+  // WHATWG URL parser percent-encodes '=' in userinfo (= → %3D).
+  // Cloud Redis providers (Azure, AWS) use base64 keys that contain '='.
+  // Without decoding, ioredis sends the encoded password → AUTH fails.
+  const decodedPassword = password ? decodeURIComponent(password) : password;
+
+  return { host: hostname, port: portInt, password: decodedPassword, db, family };
 }
 
 export function createRetryStrategy() {
