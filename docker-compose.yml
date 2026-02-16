@@ -22,7 +22,7 @@ services:
       - redis_data:/data
 
   docmost-typesense:
-    image: typesense/typesense:27.1
+    image: typesense/typesense:30.0
     container_name: docmost-typesense
     environment:
       TYPESENSE_DATA_DIR: /data
