@@ -3,7 +3,8 @@ import { currentUserAtom } from "@/features/user/atoms/current-user-atom.ts";
 
 export const useLicense = () => {
   const [currentUser] = useAtom(currentUserAtom);
-  return { hasLicenseKey: currentUser?.workspace?.hasLicenseKey };
+  // License gate bypassed — all plugin features enabled
+  return { hasLicenseKey: true };
 };
 
 export default useLicense;

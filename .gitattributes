@@ -1,0 +1,6 @@
+apps/server/src/ee/** merge=ours
+apps/client/src/ee/hooks/use-license.tsx merge=ours
+apps/server/src/integrations/environment/license-check.service.ts merge=ours
+docker-compose.yml merge=ours
+.env.example merge=ours
+.gitattributes merge=ours
