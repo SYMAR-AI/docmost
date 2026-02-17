@@ -1,69 +1,123 @@
 # DocMost Fork: Git Setup and EE Strategy
 
-This document outlines the special git configuration and directory strategy for this DocMost fork. It focuses on the clean-room reimplementation of Enterprise Edition features.
+TechMates fork of DocMost at https://github.com/SYMAR-AI/docmost.
+
+## Branch Strategy
+
+| Branch | Purpose | Force-push? |
+|--------|---------|-------------|
+| `main` | Clean upstream mirror — never commit directly | No |
+| `techmates` | Our patches rebased on top of `main` | Yes (`--force-with-lease`) |
+
+All custom work lives on `techmates`. The `main` branch is a read-only mirror of `docmost/docmost:main`.
 
 ## Git Remotes
-Both origin and upstream point to the public DocMost repository at https://github.com/docmost/docmost.git. There's no private fork at this time. All work happens on the local main branch, which has diverged from the upstream.
+
+```
+origin   → https://github.com/SYMAR-AI/docmost.git    (our fork — push here)
+upstream → https://github.com/docmost/docmost.git      (official repo — pull from here)
+```
+
+## Syncing Upstream Changes
+
+```bash
+# 1. Update main to match upstream
+git checkout main
+git pull upstream main
+git push origin main
+
+# 2. Rebase our patches on top
+git checkout techmates
+git rebase main
+
+# 3. Resolve any conflicts (see below)
+
+# 4. Force-push the rebased branch
+git push --force-with-lease origin techmates
+```
+
+### Conflict Resolution During Rebase
+
+| Conflict type | Cause | Resolution |
+|---------------|-------|------------|
+| `modify/delete` in `apps/client/src/ee/ai/*` | Upstream modified licensed EE files we deleted | `git rm` the files — our stubs replace them later in the commit chain |
+| `apps/server/src/ee~HEAD` artifact | Submodule→directory structural mismatch | `rm -rf` the artifact, `git rm` it |
+| `pnpm-lock.yaml` | Dependency changes on both sides | Accept upstream, then `pnpm install` to regenerate |
+| `docker-compose.yml` | We pin Typesense v30 | Keep our version |
+
+After resolving: `git rebase --continue`. If it goes sideways: `git rebase --abort`.
+
+### Dropping a Patch
+
+If upstream fixes something we patched (e.g., the Redis `decodeURIComponent` bug), skip that commit during rebase:
+
+```bash
+git rebase --skip
+```
 
 ## EE Directory Strategy
-The path apps/server/src/ee/ was once a git submodule pointing to the licensed DocMost EE repository. We removed the submodule and converted it into a regular directory. This change involved clearing .gitmodules and ensuring the git index tracks the folder as a normal tree.
 
-Our version of the ee directory contains only:
-- api-key/
-- attachments-ee/
-- typesense/
-- ee.module.ts
+`apps/server/src/ee/` was a git submodule pointing to DocMost's licensed EE repo. We removed the submodule and replaced it with clean-room implementations.
 
-## .gitattributes merge=ours Strategy
-The .gitattributes file at the repository root uses the merge=ours strategy to protect specific paths from upstream changes.
+Our `ee/` contains:
+- `api-key/` — JWT-based API key creation, validation, and revocation
+- `attachments-ee/` — PDF text extraction and Typesense indexing
+- `typesense/` — Hybrid keyword + semantic vector search (OpenAI text-embedding-3-large)
+- `ee.module.ts` — EE module registration
 
-Protected paths include:
-- apps/server/src/ee/** (our EE reimplementation)
-- apps/client/src/ee/hooks/use-license.tsx (client license bypass)
-- apps/server/src/integrations/environment/license-check.service.ts (server license bypass)
-- docker-compose.yml (Typesense v30 config)
-- .env.example (environment template)
-- .gitattributes (self-protection)
+### Client-Side EE Stubs
 
-The git configuration must have the merge driver enabled:
-git config merge.ours.driver true
+`apps/client/src/ee/ai/` — minimal stub files required for the Docker build. Upstream's client imports EE AI components; our stubs provide empty/no-op implementations:
 
-This strategy only works when both sides modify the same file. It won't handle cases where one side deletes a file while the other modifies it. It also doesn't solve structural conflicts between submodules and directories or handle new upstream files that don't exist in our branch.
+- `components/ai-search-result.tsx`
+- `hooks/use-ai-search.ts`
+- `pages/ai-settings.tsx`
+- `queries/ai-query.ts`
+- `types/ai.types.ts`
 
-## How to Pull Upstream Changes
-Follow these steps to merge upstream updates:
+## What We Patch Outside `ee/`
 
-1. git fetch upstream
-2. Run git merge upstream/main --no-ff --no-edit
-3. Resolve conflicts. You may see the following:
-   - Deleted files in apps/client/src/ee/ai/* if upstream modified them. Use git rm to remove these files.
-   - Artifacts like apps/server/src/ee~upstream_main. Delete the folder and use git rm on it.
-   - Conflicts in package.json or pnpm-lock.yaml. Keep our typesense version (^3.0.1) and accept other upstream changes.
-4. Commit the merge after resolution.
-5. Execute pnpm install and pnpm run build in apps/server/ to verify the build.
+Most commits only touch `ee/` and config. The exceptions:
 
-The submodule pointer conflict for apps/server/src/ee was a one-time issue and shouldn't reappear.
+| File | Change | Why |
+|------|--------|-----|
+| `apps/server/src/common/helpers/utils.ts` | `decodeURIComponent(password)` in `parseRedisUrl` | WHATWG URL parser encodes `=` as `%3D` — breaks cloud Redis AUTH with base64 keys |
+| `apps/client/src/ee/hooks/use-license.tsx` | License check bypass | Returns licensed=true without calling license server |
+| `apps/server/src/integrations/environment/license-check.service.ts` | License check bypass | Server-side equivalent |
+| `docker-compose.yml` | Typesense v30 + OpenAI config | Local dev environment |
+| `.env.example` | Additional env vars | Documents our extra config |
+| `.gitattributes` | `merge=ours` for protected paths | Prevents upstream overwriting our files |
+| `.gitmodules` | Removed ee submodule entry | Submodule→directory conversion |
 
-## What We Must Never Touch (Upstream Core)
-Files outside apps/server/src/ee/ belong to the upstream codebase. While environment.service.ts and environment.validation.ts reference Gemini, that's upstream code. The apps/server/src/core/ directory is also entirely upstream.
+## Upstream Core (Do Not Touch)
 
-Upstream core uses five dynamic require() hooks to load EE modules. These are located in:
-- app.module.ts
-- search.controller.ts
-- auth.controller.ts
-- jwt.strategy.ts
-- attachment.processor.ts
+Everything outside the files listed above belongs to upstream:
+- `apps/server/src/core/` — all upstream
+- `apps/server/src/integrations/` — upstream (except `license-check.service.ts`)
+- `apps/client/src/` — upstream (except `ee/hooks/use-license.tsx` and our `ee/ai/` stubs)
+
+Upstream uses dynamic `require()` hooks to load EE modules in:
+- `app.module.ts`, `search.controller.ts`, `auth.controller.ts`, `jwt.strategy.ts`, `attachment.processor.ts`
 
 We provide implementations for these hooks without modifying the hooks themselves.
 
-## Our EE Features
-- Typesense hybrid search: Located in ee/typesense/. It supports keyword and semantic vector search using OpenAI text-embedding-3-large embeddings.
-- API keys: Located in ee/api-key/. This feature handles JWT-based API key creation, validation, and revocation.
-- PDF attachment search: Located in ee/attachments-ee/. It uses pdf-parse for text extraction and indexes the content in Typesense.
-- AI queue no-op: Found in ee/typesense/processors/ai-queue-noop.processor.ts. This drains jobs from the AI_QUEUE since the Gemini module was removed.
+## Docker Build & Deployment
+
+Build from `techmates` branch, push to Azure Container Registry:
+
+```bash
+az acr build --registry mndgenesisacr --image docmost:latest --file Dockerfile .
+az webapp restart --name mnd-docmost-web-app --resource-group mnd-genesis
+```
 
 ## Key Environment Variables
-- OPENAI_API_KEY: Typesense uses this to generate embeddings.
-- SEARCH_DRIVER=typesense: Enables the Typesense search path.
-- TYPESENSE_URL and TYPESENSE_API_KEY: Connection details for Typesense.
-- AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT: Optional variables to use Azure OpenAI instead of direct OpenAI for embeddings.
+
+| Variable | Purpose |
+|----------|---------|
+| `SEARCH_DRIVER=typesense` | Enables Typesense search (not database) |
+| `TYPESENSE_URL` | Typesense connection URL |
+| `TYPESENSE_API_KEY` | Typesense auth key |
+| `OPENAI_API_KEY` | Embedding generation for Typesense |
+| `AZURE_OPENAI_API_KEY` | Optional — Azure OpenAI instead of direct OpenAI |
+| `AZURE_OPENAI_ENDPOINT` | Optional — Azure OpenAI endpoint |
+| `REDIS_URL` | Redis connection (use raw `=` in password, not `%3D`) |
