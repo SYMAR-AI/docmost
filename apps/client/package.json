@@ -45,6 +45,7 @@
     "posthog-js": "1.345.5",
     "react": "^18.3.1",
     "react-arborist": "3.4.0",
+    "react-pdf": "^10.0.0",
     "react-clear-modal": "^2.0.17",
     "react-dom": "^18.3.1",
     "react-drawio": "^1.0.7",
@@ -80,6 +81,7 @@
     "prettier": "^3.4.1",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.17.0",
-    "vite": "^7.2.4"
+    "vite": "^7.2.4",
+    "vite-plugin-static-copy": "^0.17.0"
   }
 }

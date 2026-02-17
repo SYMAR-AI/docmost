@@ -1,0 +1,32 @@
+.previewContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border-radius: var(--mantine-radius-default);
+  overflow: hidden;
+
+  @mixin light {
+    background-color: var(--mantine-color-gray-0);
+  }
+
+  @mixin dark {
+    background-color: var(--mantine-color-dark-7);
+  }
+}
+
+.scrollArea {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.page {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0;
+}
+
+.footer {
+  border-top: 1px solid var(--mantine-color-default-border);
+  padding: var(--mantine-spacing-xs);
+  flex-shrink: 0;
+}

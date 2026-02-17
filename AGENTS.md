@@ -88,6 +88,22 @@ Most commits only touch `ee/` and config. The exceptions:
 | `.env.example` | Additional env vars | Documents our extra config |
 | `.gitattributes` | `merge=ours` for protected paths | Prevents upstream overwriting our files |
 | `.gitmodules` | Removed ee submodule entry | Submodule→directory conversion |
+| `packages/editor-ext/src/lib/attachment/attachment.ts` | Added `preview` and `previewHeight` attributes | Inline PDF preview state persistence |
+| `apps/client/vite.config.ts` | Added `vite-plugin-static-copy` for cMaps + fonts | react-pdf needs PDF.js cMap and font files copied to dist |
+| `apps/client/src/features/editor/components/attachment/attachment-view.tsx` | Added PDF toggle button, lazy preview, resize wrapper | Inline PDF preview integration |
+| `apps/client/src/features/editor/styles/media.css` | Added `.node-attachment` to selection override | Consistent node selection behavior |
+
+### PDF Preview Feature
+
+New files added for inline PDF preview in the editor:
+
+| File | Purpose |
+|------|---------|
+| `apps/client/src/features/editor/components/attachment/pdf-preview.tsx` | Lazy-loaded PDF renderer (react-pdf, up to 10 pages inline) |
+| `apps/client/src/features/editor/components/attachment/pdf-full-modal.tsx` | Fullscreen modal for viewing complete PDF documents |
+| `apps/client/src/features/editor/components/attachment/pdf-preview.module.css` | CSS module for PDF preview styling |
+
+Dependencies added: `react-pdf@^10.0.0`, `vite-plugin-static-copy` (devDep).
 
 ## Upstream Core (Do Not Touch)
 

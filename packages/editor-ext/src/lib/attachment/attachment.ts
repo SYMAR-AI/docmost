@@ -13,6 +13,8 @@ export interface AttachmentAttributes {
   size?: number;
   attachmentId?: string;
   placeholder?: string;
+  preview?: boolean;
+  previewHeight?: number;
 }
 
 declare module "@tiptap/core" {
@@ -75,12 +77,29 @@ export const Attachment = Node.create<AttachmentOptions>({
           "data-attachment-id": attributes.attachmentId,
         }),
       },
-      placeholder: {
-        default: null,
-        rendered: false,
-      },
-    };
-  },
+       placeholder: {
+         default: null,
+         rendered: false,
+       },
+       preview: {
+         default: false,
+         parseHTML: (element) => element.getAttribute("data-attachment-preview") === "true",
+         renderHTML: (attributes) => ({
+           "data-attachment-preview": attributes.preview,
+         }),
+       },
+       previewHeight: {
+         default: null,
+         parseHTML: (element) => {
+           const val = element.getAttribute("data-attachment-preview-height");
+           return val ? parseInt(val, 10) : null;
+         },
+         renderHTML: (attributes) => ({
+           "data-attachment-preview-height": attributes.previewHeight,
+         }),
+       },
+     };
+   },
 
   parseHTML() {
     return [

@@ -1,8 +1,17 @@
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, normalizePath } from "vite";
 import react from "@vitejs/plugin-react";
 import * as path from "path";
+import { viteStaticCopy } from "vite-plugin-static-copy";
+import { createRequire } from "node:module";
 
 export const envPath = path.resolve(process.cwd(), "..", "..");
+
+const require = createRequire(import.meta.url);
+// Resolve pdfjs-dist through react-pdf's context so versions match.
+// react-pdf pins a specific pdfjs-dist version; the hoisted copy may differ.
+const reactPdfPath = path.dirname(require.resolve("react-pdf/package.json"));
+const requireFromReactPdf = createRequire(path.join(reactPdfPath, "package.json"));
+const pdfjsDistPath = path.dirname(requireFromReactPdf.resolve("pdfjs-dist/package.json"));
 
 export default defineConfig(({ mode }) => {
   const {
@@ -34,10 +43,19 @@ export default defineConfig(({ mode }) => {
       },
       APP_VERSION: JSON.stringify(process.env.npm_package_version),
     },
-    plugins: [react()],
+    plugins: [
+      react(),
+      viteStaticCopy({
+        targets: [
+          { src: normalizePath(path.join(pdfjsDistPath, "cmaps", "*")), dest: "cmaps/" },
+          { src: normalizePath(path.join(pdfjsDistPath, "standard_fonts", "*")), dest: "standard_fonts/" },
+        ],
+      }),
+    ],
     resolve: {
       alias: {
         "@": "/src",
+        "pdfjs-dist": pdfjsDistPath,
       },
     },
     server: {
