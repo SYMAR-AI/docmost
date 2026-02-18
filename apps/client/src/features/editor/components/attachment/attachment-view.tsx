@@ -1,22 +1,131 @@
 import { NodeViewProps, NodeViewWrapper } from "@tiptap/react";
-import { Group, Text, Paper, ActionIcon, Loader } from "@mantine/core";
-import { lazy, Suspense, useCallback } from "react";
+import { Group, Text, Paper, ActionIcon, Loader, Modal } from "@mantine/core";
+import { ComponentType, ReactNode, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { getFileUrl } from "@/lib/config.ts";
-import { IconDownload, IconPaperclip, IconEye, IconEyeOff } from "@tabler/icons-react";
+import { IconDownload, IconPaperclip, IconEye, IconEyeOff, IconMaximize } from "@tabler/icons-react";
 import { useDisclosure, useElementSize, useHover } from "@mantine/hooks";
 import { formatBytes } from "@/lib";
 import { useTranslation } from "react-i18next";
 import { ResizableWrapper } from "../common/resizable-wrapper";
+import { getPreviewComponent, PreviewContentProps } from "./preview-registry";
+import classes from "./attachment-preview.module.css";
 
-const PDFPreview = lazy(() => import("./pdf-preview"));
-const PDFFullModal = lazy(() => import("./pdf-full-modal"));
+const MODAL_STYLES = {
+  content: {
+    maxHeight: "90vh",
+    display: "flex" as const,
+    flexDirection: "column" as const,
+  },
+  body: {
+    flex: 1,
+    overflow: "auto" as const,
+    padding: 0,
+    minHeight: 0,
+  },
+};
+
+interface PreviewShellProps {
+  Content: ComponentType<PreviewContentProps>;
+  url: string;
+  width: number;
+  mode: "inline" | "modal";
+  onOpenFullModal?: () => void;
+}
+
+function PreviewShell({ Content, url, width, mode, onOpenFullModal }: PreviewShellProps) {
+  const { t } = useTranslation();
+  const [footer, setFooter] = useState<ReactNode>(null);
+  const footerRef = useRef<ReactNode>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Wrap setFooter in a microtask to avoid flushSync warnings from react-pdf
+  const renderFooter = useCallback((node: ReactNode) => {
+    footerRef.current = node;
+    queueMicrotask(() => {
+      setFooter(footerRef.current);
+    });
+  }, []);
+
+  // Stop ProseMirror from hijacking selectstart events inside the preview
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const stop = (e: Event) => e.stopPropagation();
+    el.addEventListener("mousedown", stop);
+    el.addEventListener("mouseup", stop);
+    el.addEventListener("pointerdown", stop);
+    el.addEventListener("selectstart", stop);
+    return () => {
+      el.removeEventListener("mousedown", stop);
+      el.removeEventListener("mouseup", stop);
+      el.removeEventListener("pointerdown", stop);
+      el.removeEventListener("selectstart", stop);
+    };
+  }, []);
+
+  const isInline = mode === "inline";
+
+  return (
+    <div
+      ref={containerRef}
+      className={`${classes.previewContainer}${!isInline ? ` ${classes.previewContainerModal}` : ""}`}
+      contentEditable={false}
+      data-preview="true"
+      onDragStart={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      style={{ userSelect: "text" }}
+    >
+      <div className={classes.scrollArea}>
+        <Content
+          url={url}
+          width={width}
+          mode={mode}
+          onOpenFullModal={onOpenFullModal}
+          renderFooter={renderFooter}
+        />
+      </div>
+      {isInline && onOpenFullModal && (
+        <ActionIcon
+          className={classes.expandButton}
+          variant="default"
+          size="md"
+          aria-label={t("Open full view")}
+          onClick={onOpenFullModal}
+        >
+          <IconMaximize size={18} />
+        </ActionIcon>
+      )}
+      {isInline && footer && (
+        <div className={classes.footer}>
+          {footer}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface ModalBodyProps {
+  Content: ComponentType<PreviewContentProps>;
+  url: string;
+}
+
+function ModalBody({ Content, url }: ModalBodyProps) {
+  const { ref, width } = useElementSize();
+
+  return (
+    <div ref={ref} className={classes.modalBody}>
+      <PreviewShell Content={Content} url={url} width={width} mode="modal" />
+    </div>
+  );
+}
 
 export default function AttachmentView(props: NodeViewProps) {
   const { t } = useTranslation();
   const { node, selected, updateAttributes, editor } = props;
   const { url, name, size, mime, preview, previewHeight } = node.attrs;
   const { hovered, ref } = useHover();
-  const isPdf = mime === "application/pdf";
   const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
   const { ref: sizeRef, width: containerWidth } = useElementSize();
   const handleResize = useCallback(
@@ -25,6 +134,8 @@ export default function AttachmentView(props: NodeViewProps) {
     },
     [updateAttributes],
   );
+
+  const PreviewContent = mime ? getPreviewComponent(mime) : undefined;
 
   return (
     <NodeViewWrapper>
@@ -55,7 +166,7 @@ export default function AttachmentView(props: NodeViewProps) {
 
             {url && (selected || hovered) && (
               <Group gap={4} wrap="nowrap">
-                {isPdf && editor.isEditable && (
+                {PreviewContent && editor.isEditable && (
                   <ActionIcon
                     variant="default"
                     aria-label={preview ? t("Collapse preview") : t("Preview")}
@@ -73,7 +184,7 @@ export default function AttachmentView(props: NodeViewProps) {
             )}
           </Group>
         </Paper>
-        {isPdf && preview && url && (
+        {PreviewContent && preview && url && (
           <Suspense fallback={<Loader size="sm" />}>
             <ResizableWrapper
               initialHeight={previewHeight || 400}
@@ -82,17 +193,32 @@ export default function AttachmentView(props: NodeViewProps) {
               onResize={handleResize}
               isEditable={editor.isEditable}
             >
-              <PDFPreview
+              <PreviewShell
+                Content={PreviewContent}
                 url={getFileUrl(url)}
                 width={containerWidth}
+                mode="inline"
                 onOpenFullModal={openModal}
               />
             </ResizableWrapper>
           </Suspense>
         )}
-        {isPdf && url && modalOpened && (
+        {PreviewContent && url && modalOpened && (
           <Suspense fallback={null}>
-            <PDFFullModal opened={modalOpened} onClose={closeModal} url={getFileUrl(url)} />
+            <Modal
+              opened={modalOpened}
+              onClose={closeModal}
+              size="70%"
+              centered
+              title={
+                <Text size="sm" fw={500}>
+                  {name}
+                </Text>
+              }
+              styles={MODAL_STYLES}
+            >
+              <ModalBody Content={PreviewContent} url={getFileUrl(url)} />
+            </Modal>
           </Suspense>
         )}
       </div>

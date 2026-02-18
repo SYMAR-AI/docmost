@@ -146,6 +146,26 @@ export const Attachment = Node.create<AttachmentOptions>({
     // Force the react node view to render immediately using flush sync (https://github.com/ueberdosis/tiptap/blob/b4db352f839e1d82f9add6ee7fb45561336286d8/packages/react/src/ReactRenderer.tsx#L183-L191)
     this.editor.isInitialized = true;
 
-    return ReactNodeViewRenderer(this.options.view);
+    return ReactNodeViewRenderer(this.options.view, {
+      stopEvent: ({ event }) => {
+        const target = event.target as HTMLElement;
+        if (target?.closest?.("[data-preview]")) {
+          return true;
+        }
+        return false;
+      },
+      ignoreMutation: ({ mutation }) => {
+        if (mutation.type === "selection") {
+          const sel = document.getSelection();
+          if (sel?.focusNode) {
+            const el = sel.focusNode instanceof HTMLElement ? sel.focusNode : sel.focusNode.parentElement;
+            if (el?.closest?.("[data-preview]")) {
+              return true;
+            }
+          }
+        }
+        return true;
+      },
+    });
   },
 });
