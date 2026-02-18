@@ -10,8 +10,6 @@ interface ResizableWrapperProps {
   onResize?: (height: number) => void;
   isEditable?: boolean;
   className?: string;
-  showHandles?: "always" | "hover";
-  direction?: "vertical" | "horizontal" | "both";
 }
 
 export const ResizableWrapper: React.FC<ResizableWrapperProps> = ({
@@ -22,40 +20,33 @@ export const ResizableWrapper: React.FC<ResizableWrapperProps> = ({
   onResize,
   isEditable = true,
   className,
-  showHandles = "hover",
-  direction = "vertical",
 }) => {
-  const [resizeParams, setResizeParams] = useState<{
-    initialSize: number;
-    initialClientY: number;
-    initialClientX: number;
-  } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [currentHeight, setCurrentHeight] = useState(initialHeight);
   const [isHovered, setIsHovered] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
+  const heightRef = useRef(initialHeight);
 
   useEffect(() => {
-    if (!resizeParams) return;
+    if (!isDragging || !dragRef.current) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!wrapperRef.current) return;
-
-      if (direction === "vertical" || direction === "both") {
-        const deltaY = e.clientY - resizeParams.initialClientY;
-        const newHeight = Math.min(
-          Math.max(resizeParams.initialSize + deltaY, minHeight),
-          maxHeight
-        );
-        setCurrentHeight(newHeight);
-        wrapperRef.current.style.height = `${newHeight}px`;
-      }
+      if (!wrapperRef.current || !dragRef.current) return;
+      const deltaY = e.clientY - dragRef.current.startY;
+      const newHeight = Math.min(
+        Math.max(dragRef.current.startHeight + deltaY, minHeight),
+        maxHeight,
+      );
+      heightRef.current = newHeight;
+      setCurrentHeight(newHeight);
+      wrapperRef.current.style.height = `${newHeight}px`;
     };
 
     const handleMouseUp = () => {
-      setResizeParams(null);
-      if (onResize && currentHeight !== initialHeight) {
-        onResize(currentHeight);
-      }
+      setIsDragging(false);
+      dragRef.current = null;
+      onResize?.(heightRef.current);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
     };
@@ -67,39 +58,31 @@ export const ResizableWrapper: React.FC<ResizableWrapperProps> = ({
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [resizeParams, currentHeight, initialHeight, onResize, minHeight, maxHeight, direction]);
+  }, [isDragging, onResize, minHeight, maxHeight]);
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-
-    setResizeParams({
-      initialSize: currentHeight,
-      initialClientY: e.clientY,
-      initialClientX: e.clientX,
-    });
-
+    dragRef.current = { startY: e.clientY, startHeight: currentHeight };
+    heightRef.current = currentHeight;
+    setIsDragging(true);
     document.body.style.cursor = "ns-resize";
     document.body.style.userSelect = "none";
   }, [currentHeight]);
-
-  const shouldShowHandles = 
-    isEditable && 
-    (showHandles === "always" || (showHandles === "hover" && (isHovered || resizeParams)));
 
   return (
     <div
       ref={wrapperRef}
       className={clsx(classes.wrapper, className, {
-        [classes.resizing]: !!resizeParams,
+        [classes.resizing]: isDragging,
       })}
       style={{ height: currentHeight }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       {children}
-      {!!resizeParams && <div className={classes.overlay} />}
-      {shouldShowHandles && direction === "vertical" && (
+      {isDragging && <div className={classes.overlay} />}
+      {isEditable && (isHovered || isDragging) && (
         <div
           className={classes.resizeHandleBottom}
           onMouseDown={handleResizeStart}
