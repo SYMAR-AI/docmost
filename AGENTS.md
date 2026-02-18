@@ -137,3 +137,9 @@ az webapp restart --name mnd-docmost-web-app --resource-group mnd-genesis
 | `AZURE_OPENAI_API_KEY` | Optional — Azure OpenAI instead of direct OpenAI |
 | `AZURE_OPENAI_ENDPOINT` | Optional — Azure OpenAI endpoint |
 | `REDIS_URL` | Redis connection (use raw `=` in password, not `%3D`) |
+
+
+
+preview mode of uploaded pdf files inline of docs? how can we do this if we would go from scratch?
+so lets focus on pdf for now with expansion of attachment nodes for switchable preview/compact mode...i am considering EmbedPDF,can you research this for our usecase? also client site render is better, i guess
+lets implement EmbedPDF, make a plan, ask me if you encounter decision splits or design, implementation choices. research the web for how to exactly use the lib properly before implementation
